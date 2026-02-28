@@ -3,13 +3,12 @@
 from functools import wraps
 
 import requests
-from robin_stocks.robinhood.globals import LOGGED_IN, OUTPUT, SESSION
+from robin_stocks.robinhood import globals as g
 
 
 def set_login_state(logged_in):
     """Sets the login state"""
-    global LOGGED_IN
-    LOGGED_IN = logged_in
+    g.set_logged_in(logged_in)
 
 def set_output(output):
     """Sets the global output stream"""
@@ -18,16 +17,14 @@ def set_output(output):
     
 def get_output():
     """Gets the current global output stream"""
-    global OUTPUT
-    return OUTPUT
+    return g.OUTPUT
 
 def login_required(func):
     """A decorator for indicating which methods require the user to be logged
        in."""
     @wraps(func)
     def login_wrapper(*args, **kwargs):
-        global LOGGED_IN
-        if not LOGGED_IN:
+        if not g.get_logged_in():
             raise Exception('{} can only be called when logged in'.format(
                 func.__name__))
         return(func(*args, **kwargs))
@@ -239,7 +236,7 @@ def request_document(url, payload=None):
 
     """ 
     try:
-        res = SESSION.get(url, params=payload)
+        res = g.get_session().get(url, params=payload)
         res.raise_for_status()
     except requests.exceptions.HTTPError as message:
         print(message, file=get_output())
@@ -272,14 +269,14 @@ def request_get(url, dataType='regular', payload=None, jsonify_data=True):
     res = None
     if jsonify_data:
         try:
-            res = SESSION.get(url, params=payload)
+            res = g.get_session().get(url, params=payload)
             res.raise_for_status()
             data = res.json()
         except (requests.exceptions.HTTPError, AttributeError) as message:
             print(message, file=get_output())
             return(data)
     else:
-        res = SESSION.get(url, params=payload)
+        res = g.get_session().get(url, params=payload)
         return(res)
     # Only continue to filter data if jsonify_data=True, and Session.get returned status code <200>.
     if (dataType == 'results'):
@@ -301,7 +298,7 @@ def request_get(url, dataType='regular', payload=None, jsonify_data=True):
             print('Found Additional pages.', file=get_output())
         while nextData['next']:
             try:
-                res = SESSION.get(nextData['next'])
+                res = g.get_session().get(nextData['next'])
                 res.raise_for_status()
                 nextData = res.json()
             except:
@@ -344,11 +341,11 @@ def request_post(url, payload=None, timeout=16, json=False, jsonify_data=True):
     try:
         if json:
             update_session('Content-Type', 'application/json')
-            res = SESSION.post(url, json=payload, timeout=timeout)
+            res = g.get_session().post(url, json=payload, timeout=timeout)
             update_session(
                 'Content-Type', 'application/x-www-form-urlencoded; charset=utf-8')
         else:
-            res = SESSION.post(url, data=payload, timeout=timeout)
+            res = g.get_session().post(url, data=payload, timeout=timeout)
         if res.status_code not in [200, 201, 202, 204, 301, 302, 303, 304, 307, 400, 401, 402, 403]:
             raise Exception("Received "+ str(res.status_code))
         data = res.json()
@@ -369,7 +366,7 @@ def request_delete(url):
 
     """
     try:
-        res = SESSION.delete(url)
+        res = g.get_session().delete(url)
         res.raise_for_status()
         data = res
     except Exception as message:
@@ -389,7 +386,7 @@ def update_session(key, value):
     :returns: None. Updates the session header with a value.
 
     """
-    SESSION.headers[key] = value
+    g.get_session().headers[key] = value
 
 
 def error_argument_not_key_in_dictionary(keyword):

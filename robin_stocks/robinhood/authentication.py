@@ -119,7 +119,7 @@ def _validate_sherrif_id(device_token: str, workflow_id: str):
 
 
 
-def login(username=None, password=None, expiresIn=86400, scope='internal', store_session=True, mfa_code=None, pickle_path="", pickle_name=""):
+def login(username=None, password=None, expiresIn=86400, scope='internal', store_session=False, mfa_code=None, pickle_path="", pickle_name=""):
     """Handles the login process to Robinhood, including multi-factor authentication, session persistence, and verification handling."""
     print("Starting login process...")
     device_token = generate_device_token()
@@ -210,12 +210,12 @@ def login(username=None, password=None, expiresIn=86400, scope='internal', store
                 update_session('Authorization', token)
                 set_login_state(True)
 
-            if store_session:
-                with open(pickle_path, 'wb') as f:
-                    pickle.dump({'token_type': data['token_type'],
-                                 'access_token': data['access_token'],
-                                 'refresh_token': data['refresh_token'],
-                                 'device_token': login_payload['device_token']}, f)
+                if store_session:
+                    with open(pickle_path, 'wb') as f:
+                        pickle.dump({'token_type': data['token_type'],
+                                     'access_token': data['access_token'],
+                                     'refresh_token': data['refresh_token'],
+                                     'device_token': login_payload['device_token']}, f)
                 return data
         except Exception as e:
             print(f"Error during login verification: {e}")
@@ -225,8 +225,27 @@ def login(username=None, password=None, expiresIn=86400, scope='internal', store
 
 
 @login_required
-def logout():
+def logout(pickle_path="", pickle_name=""):
     """Logs out from Robinhood by clearing session data."""
     set_login_state(False)
     update_session('Authorization', None)
+
+    # Determine paths exactly like login()
+    home_dir = os.path.expanduser("~")
+    data_dir = os.path.join(home_dir, ".tokens")
+
+    if pickle_path:
+        if not os.path.isabs(pickle_path):
+            pickle_path = os.path.normpath(os.path.join(os.getcwd(), pickle_path))
+        data_dir = pickle_path
+
+    if not os.path.exists(data_dir):
+        os.makedirs(data_dir)
+
+    creds_file = "robinhood" + pickle_name + ".pickle"
+    pickle_path = os.path.join(data_dir, creds_file)
+
+    if os.path.isfile(pickle_path):
+        os.remove(pickle_path)
+        
     print("Logged out successfully.")
